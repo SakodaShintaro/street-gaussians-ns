@@ -174,7 +174,6 @@ class DatasetRender(BaseRender):
                         )
                         sys.exit(1)
 
-                    is_raw = False
                     is_depth = rendered_output_name.find("depth") != -1
                     is_semantic = rendered_output_name.find("semantic") != -1
                     image_name = f"{camera_idx:05d}"
@@ -188,7 +187,6 @@ class DatasetRender(BaseRender):
                     output_name = rendered_output_name
                     if output_name.startswith("raw-"):
                         output_name = output_name[4:]
-                        is_raw = True
                         if output_name.startswith("gt-"):
                             output_name = output_name[3:]
                             output_image = gt_batch[output_name]
@@ -206,9 +204,7 @@ class DatasetRender(BaseRender):
                     del output_name
 
                     # Map to color spaces / numpy
-                    if is_raw:
-                        output_image = output_image.cpu().numpy()
-                    elif is_depth:
+                    if is_depth:
                         output_image = (
                             colormaps.apply_depth_colormap(
                                 output_image,
@@ -251,17 +247,9 @@ class DatasetRender(BaseRender):
                         )
                     writer[output_filename].add_image(output_image)
                     # images
-                    if is_raw:
-                        with gzip.open(output_path.with_suffix(".npy.gz"), "wb") as f:
-                            np.save(f, output_image)
-                    elif self.image_format == "png":
-                        media.write_image(output_path.with_suffix(".png"), output_image, fmt="png")
-                    elif self.image_format == "jpeg":
-                        media.write_image(
-                            output_path.with_suffix(".jpg"), output_image, fmt="jpeg", quality=self.jpeg_quality
-                        )
-                    else:
-                        raise ValueError(f"Unknown image format {self.image_format}")
+                    media.write_image(
+                        output_path.with_suffix(".jpg"), output_image, fmt="jpeg", quality=self.jpeg_quality
+                    )
 
         table = Table(
             title=None,
@@ -271,7 +259,6 @@ class DatasetRender(BaseRender):
         )
         table.add_row(f"Outputs {split}", str(self.output_path / split))
         CONSOLE.print(Panel(table, title=f"[bold][green]:tada: Render on split {split} Complete :tada:[/bold]", expand=False))
-
 
     def _transform_cameras_to_new_vehicle(self, dataset, dataparser_outputs):
         dataparser_scale = dataparser_outputs.dataparser_scale
