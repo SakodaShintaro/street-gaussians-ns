@@ -63,8 +63,6 @@ class DatasetRender(BaseRender):
     """Override path to the dataset."""
     downscale_factor: Optional[float] = None
     """Scaling factor to apply to the camera image resolution."""
-    split: Literal["train", "val", "test", "train+test", "all"] = "all"
-    """Split to render."""
     rendered_output_names: Optional[List[str]] = field(default_factory=lambda: None)
     """Name of the renderer outputs to use. rgb, depth, raw-depth, gt-rgb etc. By default all outputs are rendered."""
     output_format: Literal["images", "video", "images+video"] = "video"
@@ -116,161 +114,156 @@ class DatasetRender(BaseRender):
         data_manager_config = config.pipeline.datamanager
         assert isinstance(data_manager_config, (VanillaDataManagerConfig, FullImageDatamanagerConfig))
 
-        for split in self.split.split("+"):
-            datamanager: VanillaDataManager
-            dataset: Dataset
-            if split == "train":
-                with _disable_datamanager_setup(data_manager_config._target):  # pylint: disable=protected-access
-                    datamanager = data_manager_config.setup(test_mode="test", device=pipeline.device)
+        split = "all"
 
-                dataset = datamanager.train_dataset
-                dataparser_outputs = getattr(dataset, "_dataparser_outputs", datamanager.train_dataparser_outputs)
-            else:
-                with _disable_datamanager_setup(data_manager_config._target):  # pylint: disable=protected-access
-                    datamanager = data_manager_config.setup(test_mode=split, device=pipeline.device)
+        print(f"{split=}")
+        datamanager: VanillaDataManager
+        dataset: Dataset
+        with _disable_datamanager_setup(data_manager_config._target):  # pylint: disable=protected-access
+            datamanager = data_manager_config.setup(test_mode=split, device=pipeline.device)
 
-                dataset = datamanager.eval_dataset
-                dataparser_outputs = getattr(dataset, "_dataparser_outputs", None)
-                if dataparser_outputs is None:
-                    dataparser_outputs = datamanager.dataparser.get_dataparser_outputs(split=datamanager.test_split)
-            image_names_idx = [id for id, _ in sorted(enumerate(dataparser_outputs.image_filenames), key=lambda x: x[1],reverse=False)]
-            if self.vehicle_config is not None:
-                self._transform_cameras_to_new_vehicle(dataset, dataparser_outputs)
-            
-            dataloader = FixedIndicesEvalDataloader(
-                input_dataset=dataset,
-                image_indices=image_names_idx,
-                device=datamanager.device,
-                num_workers=datamanager.world_size * 4,
-            )
-            images_root = Path(os.path.commonpath(dataparser_outputs.image_filenames))
-            with Progress(
-                TextColumn(f":movie_camera: Rendering split {split} :movie_camera:"),
-                BarColumn(),
-                TaskProgressColumn(
-                    text_format="[progress.percentage]{task.completed}/{task.total:>.0f}({task.percentage:>3.1f}%)",
-                    show_speed=True,
-                ),
-                ItersPerSecColumn(suffix="fps"),
-                TimeRemainingColumn(elapsed_when_finished=False, compact=False),
-                TimeElapsedColumn(),
-            ) as progress, ExitStack() as stack:
-                writer = {}
-                for camera_idx, (camera, batch) in enumerate(progress.track(dataloader, total=len(dataset))):
-                    camera_idx = batch["image_idx"]
-                    with torch.no_grad():
-                        outputs = pipeline.model.get_outputs_for_camera(camera)
+        dataset = datamanager.eval_dataset
+        dataparser_outputs = getattr(dataset, "_dataparser_outputs", None)
+        if dataparser_outputs is None:
+            dataparser_outputs = datamanager.dataparser.get_dataparser_outputs(split=datamanager.test_split)
+        image_names_idx = [id for id, _ in sorted(enumerate(dataparser_outputs.image_filenames), key=lambda x: x[1],reverse=False)]
+        if self.vehicle_config is not None:
+            self._transform_cameras_to_new_vehicle(dataset, dataparser_outputs)
 
-                    gt_batch = batch.copy()
-                    gt_batch["rgb"] = gt_batch.pop("image")
-                    all_outputs = (
-                        list(outputs.keys())
-                        + [f"raw-{x}" for x in outputs.keys()]
-                        + [f"gt-{x}" for x in gt_batch.keys()]
-                        + [f"raw-gt-{x}" for x in gt_batch.keys()]
-                    )
-                    rendered_output_names = self.rendered_output_names
-                    if rendered_output_names is None:
-                        rendered_output_names = ["gt-rgb"] + list(outputs.keys())
-                    for rendered_output_name in rendered_output_names:
-                        if rendered_output_name not in all_outputs:
-                            CONSOLE.rule("Error", style="red")
-                            CONSOLE.print(
-                                f"Could not find {rendered_output_name} in the model outputs", justify="center"
-                            )
-                            CONSOLE.print(
-                                f"Please set --rendered-output-name to one of: {all_outputs}", justify="center"
-                            )
-                            sys.exit(1)
+        dataloader = FixedIndicesEvalDataloader(
+            input_dataset=dataset,
+            image_indices=image_names_idx,
+            device=datamanager.device,
+            num_workers=datamanager.world_size * 4,
+        )
+        images_root = Path(os.path.commonpath(dataparser_outputs.image_filenames))
+        with Progress(
+            TextColumn(f":movie_camera: Rendering split {split} :movie_camera:"),
+            BarColumn(),
+            TaskProgressColumn(
+                text_format="[progress.percentage]{task.completed}/{task.total:>.0f}({task.percentage:>3.1f}%)",
+                show_speed=True,
+            ),
+            ItersPerSecColumn(suffix="fps"),
+            TimeRemainingColumn(elapsed_when_finished=False, compact=False),
+            TimeElapsedColumn(),
+        ) as progress, ExitStack() as stack:
+            writer = {}
+            for camera_idx, (camera, batch) in enumerate(progress.track(dataloader, total=len(dataset))):
+                camera_idx = batch["image_idx"]
+                with torch.no_grad():
+                    outputs = pipeline.model.get_outputs_for_camera(camera)
 
-                        is_raw = False
-                        is_depth = rendered_output_name.find("depth") != -1
-                        is_semantic = rendered_output_name.find("semantic") != -1
-                        image_name = f"{camera_idx:05d}"
+                gt_batch = batch.copy()
+                gt_batch["rgb"] = gt_batch.pop("image")
+                all_outputs = (
+                    list(outputs.keys())
+                    + [f"raw-{x}" for x in outputs.keys()]
+                    + [f"gt-{x}" for x in gt_batch.keys()]
+                    + [f"raw-gt-{x}" for x in gt_batch.keys()]
+                )
+                rendered_output_names = self.rendered_output_names
+                if rendered_output_names is None:
+                    rendered_output_names = ["gt-rgb"] + list(outputs.keys())
+                for rendered_output_name in rendered_output_names:
+                    if rendered_output_name not in all_outputs:
+                        CONSOLE.rule("Error", style="red")
+                        CONSOLE.print(
+                            f"Could not find {rendered_output_name} in the model outputs", justify="center"
+                        )
+                        CONSOLE.print(
+                            f"Please set --rendered-output-name to one of: {all_outputs}", justify="center"
+                        )
+                        sys.exit(1)
 
-                        # Try to get the original filename
-                        image_name = dataparser_outputs.image_filenames[camera_idx].relative_to(images_root)
+                    is_raw = False
+                    is_depth = rendered_output_name.find("depth") != -1
+                    is_semantic = rendered_output_name.find("semantic") != -1
+                    image_name = f"{camera_idx:05d}"
 
-                        output_path = self.output_path / split / rendered_output_name / image_name
-                        output_path.parent.mkdir(exist_ok=True, parents=True)
+                    # Try to get the original filename
+                    image_name = dataparser_outputs.image_filenames[camera_idx].relative_to(images_root)
 
-                        output_name = rendered_output_name
-                        if output_name.startswith("raw-"):
-                            output_name = output_name[4:]
-                            is_raw = True
-                            if output_name.startswith("gt-"):
-                                output_name = output_name[3:]
-                                output_image = gt_batch[output_name]
-                            else:
-                                output_image = outputs[output_name]
-                                if is_depth:
-                                    # Divide by the dataparser scale factor
-                                    output_image.div_(dataparser_outputs.dataparser_scale)
+                    output_path = self.output_path / split / rendered_output_name / image_name
+                    output_path.parent.mkdir(exist_ok=True, parents=True)
+
+                    output_name = rendered_output_name
+                    if output_name.startswith("raw-"):
+                        output_name = output_name[4:]
+                        is_raw = True
+                        if output_name.startswith("gt-"):
+                            output_name = output_name[3:]
+                            output_image = gt_batch[output_name]
                         else:
-                            if output_name.startswith("gt-"):
-                                output_name = output_name[3:]
-                                output_image = gt_batch[output_name]
-                            else:
-                                output_image = outputs[output_name]
-                        del output_name
+                            output_image = outputs[output_name]
+                            if is_depth:
+                                # Divide by the dataparser scale factor
+                                output_image.div_(dataparser_outputs.dataparser_scale)
+                    else:
+                        if output_name.startswith("gt-"):
+                            output_name = output_name[3:]
+                            output_image = gt_batch[output_name]
+                        else:
+                            output_image = outputs[output_name]
+                    del output_name
 
-                        # Map to color spaces / numpy
+                    # Map to color spaces / numpy
+                    if is_raw:
+                        output_image = output_image.cpu().numpy()
+                    elif is_depth:
+                        output_image = (
+                            colormaps.apply_depth_colormap(
+                                output_image,
+                                near_plane=self.depth_near_plane,
+                                far_plane=self.depth_far_plane,
+                                colormap_options=self.colormap_options,
+                            )
+                            .cpu()
+                            .numpy()
+                        )
+                    elif is_semantic:
+                        if output_name.startswith("gt-"):
+                            output_image = (output_image.squeeze().cpu().numpy() * 100).astype(np.uint8)
+                        else:
+                            # Output image is logits
+                            output_image = (output_image.argmax(dim=-1).cpu().numpy() * 100).astype(np.uint8)
+                    else:
+                        output_image = (
+                            colormaps.apply_colormap(
+                                image=output_image,
+                                colormap_options=self.colormap_options,
+                            )
+                            .cpu()
+                            .numpy()
+                        )
+
+                    # Save to file
+                    if "video" in self.output_format.split("+"):
+                        output_filename = str(output_path.parent.with_suffix(".mp4"))
+                        # output_image = output_image[:299,:539]
+                        if output_filename not in writer:
+                            render_width = int(output_image.shape[1])
+                            render_height = int(output_image.shape[0])
+                            writer[output_filename] = stack.enter_context(
+                                media.VideoWriter(
+                                    path=output_filename,
+                                    shape=(render_height, render_width),
+                                    fps=10,
+                                )
+                            )
+                        writer[output_filename].add_image(output_image)
+                    if "images" in self.output_format.split("+"):
                         if is_raw:
-                            output_image = output_image.cpu().numpy()
-                        elif is_depth:
-                            output_image = (
-                                colormaps.apply_depth_colormap(
-                                    output_image,
-                                    near_plane=self.depth_near_plane,
-                                    far_plane=self.depth_far_plane,
-                                    colormap_options=self.colormap_options,
-                                )
-                                .cpu()
-                                .numpy()
+                            with gzip.open(output_path.with_suffix(".npy.gz"), "wb") as f:
+                                np.save(f, output_image)
+                        elif self.image_format == "png":
+                            media.write_image(output_path.with_suffix(".png"), output_image, fmt="png")
+                        elif self.image_format == "jpeg":
+                            media.write_image(
+                                output_path.with_suffix(".jpg"), output_image, fmt="jpeg", quality=self.jpeg_quality
                             )
-                        elif is_semantic:
-                            if output_name.startswith("gt-"):
-                                output_image = (output_image.squeeze().cpu().numpy() * 100).astype(np.uint8)
-                            else:
-                                # Output image is logits
-                                output_image = (output_image.argmax(dim=-1).cpu().numpy() * 100).astype(np.uint8)
                         else:
-                            output_image = (
-                                colormaps.apply_colormap(
-                                    image=output_image,
-                                    colormap_options=self.colormap_options,
-                                )
-                                .cpu()
-                                .numpy()
-                            )
-
-                        # Save to file
-                        if "video" in self.output_format.split("+"):
-                            output_filename = str(output_path.parent.with_suffix(".mp4"))
-                            # output_image = output_image[:299,:539]
-                            if output_filename not in writer:
-                                render_width = int(output_image.shape[1])
-                                render_height = int(output_image.shape[0])
-                                writer[output_filename] = stack.enter_context(
-                                    media.VideoWriter(
-                                        path=output_filename,
-                                        shape=(render_height, render_width),
-                                        fps=10,
-                                    )
-                                )
-                            writer[output_filename].add_image(output_image)
-                        if "images" in self.output_format.split("+"):
-                            if is_raw:
-                                with gzip.open(output_path.with_suffix(".npy.gz"), "wb") as f:
-                                    np.save(f, output_image)
-                            elif self.image_format == "png":
-                                media.write_image(output_path.with_suffix(".png"), output_image, fmt="png")
-                            elif self.image_format == "jpeg":
-                                media.write_image(
-                                    output_path.with_suffix(".jpg"), output_image, fmt="jpeg", quality=self.jpeg_quality
-                                )
-                            else:
-                                raise ValueError(f"Unknown image format {self.image_format}")
+                            raise ValueError(f"Unknown image format {self.image_format}")
 
         table = Table(
             title=None,
@@ -278,8 +271,7 @@ class DatasetRender(BaseRender):
             box=box.MINIMAL,
             title_style=style.Style(bold=True),
         )
-        for split in self.split.split("+"):
-            table.add_row(f"Outputs {split}", str(self.output_path / split))
+        table.add_row(f"Outputs {split}", str(self.output_path / split))
         CONSOLE.print(Panel(table, title=f"[bold][green]:tada: Render on split {split} Complete :tada:[/bold]", expand=False))
 
 
