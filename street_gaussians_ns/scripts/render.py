@@ -65,8 +65,6 @@ class DatasetRender(BaseRender):
     """Scaling factor to apply to the camera image resolution."""
     rendered_output_names: Optional[List[str]] = field(default_factory=lambda: None)
     """Name of the renderer outputs to use. rgb, depth, raw-depth, gt-rgb etc. By default all outputs are rendered."""
-    output_format: Literal["images", "video", "images+video"] = "video"
-    """How to save output data."""
     vehicle_config: Optional[Path] = None
     """Camera pose transform config on the new vehicle."""
     depth_near_plane: Optional[float] = 0.
@@ -238,32 +236,32 @@ class DatasetRender(BaseRender):
                         )
 
                     # Save to file
-                    if "video" in self.output_format.split("+"):
-                        output_filename = str(output_path.parent.with_suffix(".mp4"))
-                        # output_image = output_image[:299,:539]
-                        if output_filename not in writer:
-                            render_width = int(output_image.shape[1])
-                            render_height = int(output_image.shape[0])
-                            writer[output_filename] = stack.enter_context(
-                                media.VideoWriter(
-                                    path=output_filename,
-                                    shape=(render_height, render_width),
-                                    fps=10,
-                                )
+                    # video
+                    output_filename = str(output_path.parent.with_suffix(".mp4"))
+                    # output_image = output_image[:299,:539]
+                    if output_filename not in writer:
+                        render_width = int(output_image.shape[1])
+                        render_height = int(output_image.shape[0])
+                        writer[output_filename] = stack.enter_context(
+                            media.VideoWriter(
+                                path=output_filename,
+                                shape=(render_height, render_width),
+                                fps=10,
                             )
-                        writer[output_filename].add_image(output_image)
-                    if "images" in self.output_format.split("+"):
-                        if is_raw:
-                            with gzip.open(output_path.with_suffix(".npy.gz"), "wb") as f:
-                                np.save(f, output_image)
-                        elif self.image_format == "png":
-                            media.write_image(output_path.with_suffix(".png"), output_image, fmt="png")
-                        elif self.image_format == "jpeg":
-                            media.write_image(
-                                output_path.with_suffix(".jpg"), output_image, fmt="jpeg", quality=self.jpeg_quality
-                            )
-                        else:
-                            raise ValueError(f"Unknown image format {self.image_format}")
+                        )
+                    writer[output_filename].add_image(output_image)
+                    # images
+                    if is_raw:
+                        with gzip.open(output_path.with_suffix(".npy.gz"), "wb") as f:
+                            np.save(f, output_image)
+                    elif self.image_format == "png":
+                        media.write_image(output_path.with_suffix(".png"), output_image, fmt="png")
+                    elif self.image_format == "jpeg":
+                        media.write_image(
+                            output_path.with_suffix(".jpg"), output_image, fmt="jpeg", quality=self.jpeg_quality
+                        )
+                    else:
+                        raise ValueError(f"Unknown image format {self.image_format}")
 
         table = Table(
             title=None,
