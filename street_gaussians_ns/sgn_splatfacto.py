@@ -1079,6 +1079,7 @@ class SplatfactoModel(Model):
         # RGB loss
         rgb = outputs["rgb"]
         if mask is not None:
+            mask = mask.to(gt_img.device)
             gt_img *= mask
             rgb *= mask
         Ll1 = torch.abs(gt_img - rgb).mean()
