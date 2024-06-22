@@ -585,7 +585,7 @@ class ColmapDataParser(DataParser):
 
     def _downscale_and_undistort_one(self, camera: Cameras, filename):
         assert len(camera.shape) == 0
-        
+
         width, height = imagesize.get(filename["image"])
         width = width // self._downscale_factor
         height = height // self._downscale_factor
