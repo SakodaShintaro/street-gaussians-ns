@@ -475,6 +475,7 @@ class ColmapDataParser(DataParser):
 
     def _load_3D_points(self, colmap_path: Path, transform_matrix: torch.Tensor, scale_factor: float):
         points_filepath = colmap_path / self.config.init_points_filename
+        print(f"{points_filepath=}")
         assert points_filepath.exists()
         if points_filepath.suffix == ".bin":
             colmap_points = colmap_utils.read_points3D_binary(points_filepath)
@@ -482,7 +483,11 @@ class ColmapDataParser(DataParser):
             colmap_points = colmap_utils.read_points3D_text(points_filepath)
         else:
             raise ValueError(f"Could not find points3D.txt or points3D.bin in {colmap_path}")
-        points3D = torch.from_numpy(np.array([p.xyz for p in colmap_points.values()], dtype=np.float32))
+        points3D_np = np.array(
+            [p.xyz for p in colmap_points.values()], dtype=np.float32
+        )
+        print(f"{points3D_np.shape=}")
+        points3D = torch.from_numpy(points3D_np)
         points3D = (
             torch.cat(
                 (
