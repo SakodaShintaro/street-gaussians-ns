@@ -220,7 +220,7 @@ class ColmapDataParser(DataParser):
             out["applied_transform"] = applied_transform.tolist()
         out["camera_model"] = camera_model
         if meta:
-            # Colmap is run after this translation to all poses. 
+            # Colmap is run after this translation to all poses.
             first_frame_pose = np.array(meta["frames"][0]["transform_matrix"])[:3,3]
             out["applied_translation_in_colmap"] = (-first_frame_pose * 0.98).tolist()
         assert len(frames) > 0, "No images found in the colmap model"
