@@ -587,8 +587,8 @@ class ColmapDataParser(DataParser):
         assert len(camera.shape) == 0
 
         width, height = imagesize.get(filename["image"])
-        width = width // self._downscale_factor
-        height = height // self._downscale_factor
+        width = int(width // self._downscale_factor)
+        height = int(height // self._downscale_factor)
 
         contents = [(channel, self.channel_path[channel], filename[channel]) for channel in filename.keys()] 
         data = {}
