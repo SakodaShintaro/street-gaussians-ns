@@ -598,7 +598,7 @@ class ColmapDataParser(DataParser):
             out = self._get_fname(self.config.data / path, filename)
             if "all" not in self.config.force_save_undistort_data and key not in self.config.force_save_undistort_data and out.exists():
                 continue
-            assert filename.suffix in (".png", ".jpg")
+            assert filename.suffix in (".png", ".jpg", ".jpeg")
             value = cv2.imread(filename.as_posix(), cv2.IMREAD_UNCHANGED)
             if self._downscale_factor > 1:
                 value = cv2.resize(
