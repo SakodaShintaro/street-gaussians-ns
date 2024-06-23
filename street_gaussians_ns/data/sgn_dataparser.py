@@ -299,8 +299,7 @@ class ColmapDataParser(DataParser):
         dataparser_outputs_path = self.config.data/"dataparser_transforms.json"
         meta = self._get_all_images_and_cameras(colmap_path)
         camera_type = torch.tensor([CAMERA_MODEL_TO_TYPE[model].value for model in meta["camera_model"]])
-        
-        
+
         filenames = defaultdict(list) 
 
         camera_ids = []
