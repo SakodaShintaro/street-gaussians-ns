@@ -6,6 +6,7 @@
 python3 -m venv .env
 source .env/bin/activate
 pip3 install torch torchvision
+git submodule update --init --recursive
 pip3 install ninja git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 pip3 install nerfstudio
 pip3 install "git+https://github.com/facebookresearch/pytorch3d.git"
