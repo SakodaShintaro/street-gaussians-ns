@@ -51,3 +51,23 @@ python3 ./scripts/pythons/extract_waymo.py --waymo_root ./data/ --out_root ./dat
 bash scripts/shells/data_process.sh ./data/extracted
 bash scripts/shells/train.sh ./data/extracted 0
 ```
+
+## Dockerを使って環境構築する場合
+
+nerf-studioのドキュメントを参考にする
+
+<https://docs.nerf.studio/quickstart/installation.html#use-docker-image>
+
+<https://hub.docker.com/r/dromni/nerfstudio>
+
+から最新を取得する。現在だと
+
+```bash
+docker run --gpus all \
+            -v $HOME/data:/home/user/data/ \
+            -v $HOME/.cache/:/home/user/.cache/ \
+            -p 7007:7007 \
+            -it \
+            --ipc=host \
+            dromni/nerfstudio:1.1.3
+```
