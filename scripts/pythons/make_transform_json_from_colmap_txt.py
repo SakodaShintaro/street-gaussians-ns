@@ -38,7 +38,7 @@ import json
 from scipy.spatial.transform import Rotation
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("target_dir", type=Path)
     return parser.parse_args()
@@ -49,7 +49,7 @@ CameraModel = collections.namedtuple(
 )
 Camera = collections.namedtuple("Camera", ["id", "model", "width", "height", "params"])
 BaseImage = collections.namedtuple(
-    "Image", ["id", "qvec", "tvec", "camera_id", "name", "xys", "point3D_ids"]
+    "BaseImage", ["id", "qvec", "tvec", "camera_id", "name", "xys", "point3D_ids"]
 )
 Point3D = collections.namedtuple(
     "Point3D", ["id", "xyz", "rgb", "error", "image_ids", "point2D_idxs"]
@@ -57,11 +57,11 @@ Point3D = collections.namedtuple(
 
 
 class Image(BaseImage):
-    def qvec2rotmat(self):
+    def qvec2rotmat(self) -> np.ndarray:
         return qvec2rotmat(self.qvec)
 
 
-def qvec2rotmat(qvec):
+def qvec2rotmat(qvec: np.ndarray) -> np.ndarray:
     return np.array(
         [
             [
@@ -83,7 +83,7 @@ def qvec2rotmat(qvec):
     )
 
 
-def read_cameras_text(path):
+def read_cameras_text(path: str) -> dict:
     """
     see: src/colmap/scene/reconstruction.cc
         void Reconstruction::WriteCamerasText(const std::string& path)
@@ -113,7 +113,7 @@ def read_cameras_text(path):
     return cameras
 
 
-def read_images_text(path):
+def read_images_text(path: str) -> dict:
     """
     see: src/colmap/scene/reconstruction.cc
         void Reconstruction::ReadImagesText(const std::string& path)
@@ -201,12 +201,12 @@ if __name__ == "__main__":
             }
         )
 
-    json_frames = {"frames": json_frames}
+    json_data = {"frames": json_frames}
     json_path = target_dir / "transform.json"
     with open(json_path, "w") as f:
-        json.dump(json_frames, f, indent=4)
+        json.dump(json_data, f, indent=4)
 
-    annotation_json = {"frames": []}
+    annotation_json: dict[str, list] = {"frames": []}
     annotation_json_path = target_dir / "annotation.json"
     with open(annotation_json_path, "w") as f:
         json.dump(annotation_json, f, indent=4)
