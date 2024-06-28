@@ -257,6 +257,7 @@ class ColmapDataParser(DataParser):
             raise RuntimeError(f"The dataset's list of filenames for split {split} is missing.")
         else:
             # filter image_filenames and poses based on train/eval split percentage
+            print(f"{self.config.frame_select=}")
             if self.config.frame_select is not None:
                 _, counts = torch.unique(camera_ids, return_counts=True)
                 frame_len = counts[0]
@@ -273,6 +274,8 @@ class ColmapDataParser(DataParser):
                     [i for i in all_idx if camera_ids[i] in self.config.filter_camera_id], dtype=np.int32
                 )
             num_images = len(all_idx)
+            print(f"{num_images=}")
+            print(f"{num_train_images=}")
             num_train_images = math.ceil(num_images * self.config.train_split_fraction)
             num_eval_images = num_images - num_train_images
             i_all = np.arange(num_images)
