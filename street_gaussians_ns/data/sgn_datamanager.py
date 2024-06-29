@@ -146,6 +146,7 @@ class FullImageDatamanager(DataManager, Generic[TDataset]):
 
         def undistort_idx(idx: int) -> Dict[str, torch.Tensor]:
             data = dataset.get_data(idx, image_type=self.config.cache_images_type)
+            return data
             camera = dataset.cameras[idx].reshape(())
             assert data["image"].shape[1] == camera.width.item() and data["image"].shape[0] == camera.height.item(), (
                 f'The size of image ({data["image"].shape[1]}, {data["image"].shape[0]}) loaded '
