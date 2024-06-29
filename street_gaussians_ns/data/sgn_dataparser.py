@@ -274,9 +274,9 @@ class ColmapDataParser(DataParser):
                     [i for i in all_idx if camera_ids[i] in self.config.filter_camera_id], dtype=np.int32
                 )
             num_images = len(all_idx)
+            num_train_images = math.ceil(num_images * self.config.train_split_fraction)
             print(f"{num_images=}")
             print(f"{num_train_images=}")
-            num_train_images = math.ceil(num_images * self.config.train_split_fraction)
             num_eval_images = num_images - num_train_images
             i_all = np.arange(num_images)
             i_train = np.linspace(
