@@ -188,15 +188,13 @@ if __name__ == "__main__":
                 "cy": camera.params[3],
                 "w": int(camera.width),
                 "h": int(camera.height),
-                "camera_model": "OPENCV",
+                "camera_model": camera.model,
                 "camera": camera_name,
                 "timestamp": float(timestamp / 1e9),
                 "k1": camera.params[4],
                 "k2": camera.params[5],
-                "k3": 0.0,
-                "k4": 0.0,
-                "p1": camera.params[6],
-                "p2": camera.params[7],
+                "k3": camera.params[6],
+                "k4": camera.params[7],
                 "transform_matrix": transform_matrix.tolist(),
             }
         )
