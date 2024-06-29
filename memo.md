@@ -69,5 +69,6 @@ docker run --gpus all \
             -p 7007:7007 \
             -it \
             --ipc=host \
-            dromni/nerfstudio:1.1.3
+            dromni/nerfstudio:1.1.3 \
+            /bin/bash
 ```
