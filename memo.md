@@ -72,3 +72,16 @@ docker run --gpus all \
             dromni/nerfstudio:1.1.3 \
             /bin/bash
 ```
+
+```bash
+git submodule update --init --recursive
+pip3 install "git+https://github.com/facebookresearch/pytorch3d.git"
+pip3 install -e .
+pip3 install dependencies/nvdiffrast/
+cd dependencies/detectron2
+pip3 install -e .
+cd ../Mask2Former
+pip3 install -r requirements.txt
+cd mask2former/modeling/pixel_decoder/ops
+sh make.sh # これは権限の問題で上手くいかない。どうしたものか……
+```
