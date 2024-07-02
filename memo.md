@@ -83,5 +83,7 @@ pip3 install -e .
 cd ../Mask2Former
 pip3 install -r requirements.txt
 cd mask2former/modeling/pixel_decoder/ops
-sh make.sh # これは権限の問題で上手くいかない。どうしたものか……
+sh make.sh
+# これは権限の問題で上手くいかない
+# make.shスクリプトの末尾に--userをつければいい
 ```
