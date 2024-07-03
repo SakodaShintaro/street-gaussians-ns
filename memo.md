@@ -7,6 +7,8 @@ python3 -m venv .env
 source .env/bin/activate
 pip3 install torch torchvision
 git submodule update --init --recursive
+pip3 install rawpy==0.21.0
+pip3 install numpy==1.24.3 pandas==2.2.1
 pip3 install ninja git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 pip3 install nerfstudio
 pip3 install "git+https://github.com/facebookresearch/pytorch3d.git"
@@ -18,6 +20,7 @@ cd ../Mask2Former
 pip3 install -r requirements.txt
 cd mask2former/modeling/pixel_decoder/ops
 sh make.sh
+sudo apt install -y ffmpeg
 
 pip3 install --upgrade pip
 pip3 install waymo-open-dataset-tf-2-12-0
@@ -86,4 +89,6 @@ cd mask2former/modeling/pixel_decoder/ops
 sh make.sh
 # これは権限の問題で上手くいかない
 # make.shスクリプトの末尾に--userをつければいい
+
+sudo apt install -y libgl1-mesa-glx libglib2.0-0
 ```
