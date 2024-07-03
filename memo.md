@@ -6,6 +6,7 @@
 python3 -m venv .env
 source .env/bin/activate
 pip3 install torch torchvision
+git clone https://github.com/SakodaShintaro/street-gaussians-ns
 git submodule update --init --recursive
 pip3 install rawpy==0.21.0
 pip3 install numpy==1.24.3 pandas==2.2.1
@@ -72,11 +73,13 @@ docker run --gpus all \
             -p 7007:7007 \
             -it \
             --ipc=host \
-            dromni/nerfstudio:1.1.3 \
+            --privileged \
+            my-pytorch-image \
             /bin/bash
 ```
 
 ```bash
+sudo apt install -y ffmpeg libgl1-mesa-glx libglib2.0-0
 git submodule update --init --recursive
 pip3 install "git+https://github.com/facebookresearch/pytorch3d.git"
 pip3 install -e .
@@ -91,4 +94,10 @@ sh make.sh
 # make.shスクリプトの末尾に--userをつければいい
 
 sudo apt install -y libgl1-mesa-glx libglib2.0-0
+```
+
+## イメージをDockerfileから作る
+
+```bash
+docker build -t my-pytorch-image .
 ```
