@@ -70,6 +70,7 @@ nerf-studioのドキュメントを参考にする
 docker run --gpus all \
             -v $HOME/data:/home/user/data/ \
             -v $HOME/.cache/:/home/user/.cache/ \
+            -v /media:/media \
             -p 7007:7007 \
             -it \
             --ipc=host \
@@ -92,6 +93,7 @@ cd mask2former/modeling/pixel_decoder/ops
 sh make.sh
 # これは権限の問題で上手くいかない
 # make.shスクリプトの末尾に--userをつければいい
+python3 setup.py build install --user
 
 sudo apt install -y libgl1-mesa-glx libglib2.0-0
 ```
