@@ -96,6 +96,7 @@ sh make.sh
 python3 setup.py build install --user
 
 sudo apt install -y libgl1-mesa-glx libglib2.0-0
+sudo apt install tzdata
 ```
 
 ## イメージをDockerfileから作る
