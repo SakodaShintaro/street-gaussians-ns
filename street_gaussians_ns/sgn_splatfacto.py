@@ -124,7 +124,7 @@ class EnvLight(torch.nn.Module):
         self.base = torch.nn.Parameter(
             0.5 * torch.ones(6, resolution, resolution, 3, requires_grad=True),
         )
-    
+
     def get_world_directions(self, camera, train=False):
         W, H = int(camera.width.item()), int(camera.height.item())
         cx = camera.cx.item()
@@ -143,7 +143,10 @@ class EnvLight(torch.nn.Module):
                                         (v-cy+0.5)/fy,
                                         torch.ones_like(u)], dim=0)
         directions = F.normalize(directions, dim=0)
-        directions = (c2w[:3, :3] @ directions.reshape(3, -1)).reshape(3, H, W)
+        R_edit = torch.diag(
+            torch.tensor([1, -1, -1], device=c2w.device, dtype=c2w.dtype)
+        )
+        directions = (c2w[:3, :3] @ R_edit @ directions.reshape(3, -1)).reshape(3, H, W)
         return directions
 
     def forward(self, camera, train=False):
