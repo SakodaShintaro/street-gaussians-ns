@@ -1,6 +1,8 @@
 #!/bin/bash
 set -eux
 
+export TORCH_CUDA_ARCH_LIST="8.6"
+
 cd $(dirname $0)/../../
 dataset_dir=$1
 
