@@ -104,3 +104,9 @@ sudo apt install tzdata
 ```bash
 docker build -t my-pytorch-image .
 ```
+
+モデルのコピー
+
+```bash
+wget -P dependencies/Mask2Former/models/ https://dl.fbaipublicfiles.com/maskformer/mask2former/mapillary_vistas/semantic/maskformer2_swin_large_IN21k_384_bs16_300k/model_final_90ee2d.pkl
+```
