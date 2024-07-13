@@ -899,7 +899,7 @@ class SplatfactoModel(Model):
             return out
 
         # Important to allow xys grads to populate properly
-        if self.training:
+        if self.training and self.xys.requires_grad:
             self.xys.retain_grad()
 
         gaussian_attrs = {

@@ -163,7 +163,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         for model_name, vals_t in zip(self.visible_model_names, vals_split):
             model = self.all_models[model_name]
             setattr(model, var_name, vals_t)
-            if retain_grad and self.training:
+            if retain_grad and self.training and getattr(model, var_name).requires_grad:
                 getattr(model, var_name).retain_grad()
 
     @property
