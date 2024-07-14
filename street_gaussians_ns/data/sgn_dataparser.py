@@ -81,9 +81,9 @@ class ColmapDataParserConfig(DataParserConfig):
     """Filter images by camera id, None or empty list means no need to filter."""
     images_path: Path = Path("images")
     """Path to images directory relative to the data path."""
-    masks_path: Optional[Path] = None
+    masks_path: Optional[Path] = Path("masks")
     """Path to masks directory. If not set, masks are not loaded."""
-    segments_path: Optional[Path] = None
+    segments_path: Optional[Path] = Path("segs")
     """Path to segments directory. If not set, segments are not loaded."""
     colmap_path: Path = Path("colmap/sparse/0")
     """Path to the colmap reconstruction directory relative to the data path."""

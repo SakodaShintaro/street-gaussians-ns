@@ -33,3 +33,14 @@ python3 scripts/pythons/concat_images.py \
   --text2 "Street-Gaussigns-NS" \
   --ext "jpg"
 date -ud @$SECONDS "+%T"
+
+# make movie
+file_list=$(find ${latest_output_dir}/renders/all/concat -name "*.jpg" | sort -V)
+ffmpeg -r 10 \
+       -f concat -safe 0 -i <(printf "file '%s'\n" ${file_list}) \
+       -vcodec libx264 \
+       -pix_fmt yuv420p \
+       -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" \
+       -r 10 \
+       ${latest_output_dir}/renders/all/concat.mp4
+date -ud @$SECONDS "+%T"

@@ -35,7 +35,6 @@ street_gaussians_ns_method = MethodSpecification(
                     max_2D_matches_per_3D_point=0,
                     undistort=True,
                     colmap_path=Path("colmap/sparse/0"),
-                    segments_path=Path("segs"),
                     load_dynamic_annotations=True,
                 ),
             ),
