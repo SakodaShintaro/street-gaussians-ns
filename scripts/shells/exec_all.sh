@@ -20,10 +20,6 @@ latest_output_dir=$(ls -td $dataset_dir/../output/street-gaussians-ns/street-gau
 bash scripts/shells/render.sh $latest_output_dir/config.yml $cuda_id
 date -ud @$SECONDS "+%T"
 
-# Eval model
-bash scripts/shells/eval.sh $latest_output_dir/config.yml $cuda_id
-date -ud @$SECONDS "+%T"
-
 # concat
 python3 scripts/pythons/concat_images.py \
   ${latest_output_dir}/renders/all/gt-rgb \
@@ -43,4 +39,8 @@ ffmpeg -r 10 \
        -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" \
        -r 10 \
        ${latest_output_dir}/renders/all/concat.mp4
+date -ud @$SECONDS "+%T"
+
+# Eval model
+bash scripts/shells/eval.sh $latest_output_dir/config.yml $cuda_id
 date -ud @$SECONDS "+%T"
