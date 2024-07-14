@@ -114,7 +114,7 @@ def projection_matrix(
     t = z_near * math.tan(0.5 * fov_y)
     b = -t
     r = z_near * math.tan(0.5 * fov_x)
-    l = -r
+    l = -r  # noqa: E741
     n = z_near
     f = z_far
     return torch.tensor(
@@ -132,9 +132,6 @@ class EnvLight(torch.nn.Module):
 
     def __init__(self, resolution=1024):
         super().__init__()
-        self.to_opengl = torch.tensor(
-            [[1, 0, 0], [0, 0, 1], [0, -1, 0]], dtype=torch.float32, device="cuda"
-        )
         self.base = torch.nn.Parameter(
             0.5 * torch.ones(6, resolution, resolution, 3, requires_grad=True),
         )
@@ -171,15 +168,17 @@ class EnvLight(torch.nn.Module):
         return directions
 
     def forward(self, camera, train=False):
-        l = self.get_world_directions(camera, train).permute(1, 2, 0)
-        l = (l.reshape(-1, 3) @ self.to_opengl.T).reshape(*l.shape)
-        l = l.contiguous()
-        prefix = l.shape[:-1]
+        dir_each_uv = self.get_world_directions(camera, train).permute(1, 2, 0)
+        dir_each_uv = dir_each_uv.contiguous()
+        prefix = dir_each_uv.shape[:-1]
         if len(prefix) != 3:  # reshape to [B, H, W, -1]
-            l = l.reshape(1, 1, -1, l.shape[-1])
+            dir_each_uv = dir_each_uv.reshape(1, 1, -1, dir_each_uv.shape[-1])
 
         light = dr.texture(
-            self.base[None, ...], l, filter_mode="linear", boundary_mode="cube"
+            self.base[None, ...],
+            dir_each_uv,
+            filter_mode="linear",
+            boundary_mode="cube",
         )
         light = light.view(*prefix, -1)
 
