@@ -5,21 +5,29 @@ from typing import Dict, List, Type, Union
 import copy
 import math
 
-from gsplat.sh import spherical_harmonics
+from gsplat import spherical_harmonics
 from pytorch3d.transforms import quaternion_multiply
 from torch.nn import Parameter
-import mediapy as media
 import torch
-import torchvision.transforms.functional as TF
 
-from nerfstudio.engine.callbacks import TrainingCallback, TrainingCallbackAttributes, TrainingCallbackLocation
+from nerfstudio.engine.callbacks import (
+    TrainingCallback,
+    TrainingCallbackAttributes,
+    TrainingCallbackLocation,
+)
 from nerfstudio.cameras.camera_utils import quaternion_from_matrix
 from nerfstudio.cameras.cameras import Cameras
 
 from street_gaussians_ns.sgn_splatfacto import SplatfactoModel, SplatfactoModelConfig
-from street_gaussians_ns.data.utils.bbox_optimizers import BBoxOptimizerConfig, BBoxOptimizer
-from street_gaussians_ns.data.utils.dynamic_annotation import InterpolatedAnnotation, Box, parse_timestamp
-
+from street_gaussians_ns.data.utils.bbox_optimizers import (
+    BBoxOptimizerConfig,
+    BBoxOptimizer,
+)
+from street_gaussians_ns.data.utils.dynamic_annotation import (
+    InterpolatedAnnotation,
+    Box,
+    parse_timestamp,
+)
 
 
 @dataclass
@@ -28,9 +36,13 @@ class SplatfactoSceneGraphModelConfig(SplatfactoModelConfig):
 
     _target: Type = field(default_factory=lambda: SplatfactoSceneGraphModel)
 
-    background_model: SplatfactoModelConfig = field(default_factory=SplatfactoModelConfig)
+    background_model: SplatfactoModelConfig = field(
+        default_factory=SplatfactoModelConfig
+    )
     """Background model config"""
-    object_model_template: SplatfactoModelConfig = field(default_factory=SplatfactoModelConfig)
+    object_model_template: SplatfactoModelConfig = field(
+        default_factory=SplatfactoModelConfig
+    )
     """Object model config"""
     bbox_optimizer: BBoxOptimizerConfig = field(default_factory=BBoxOptimizerConfig)
     """Bounding box optimizer config"""
@@ -46,12 +58,13 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     """
 
     config: SplatfactoSceneGraphModelConfig
+
     def populate_modules(self):
         self.seed_points = None
         self.config.random_init = True
         super().populate_modules()
         for gs_param in list(self.gauss_params.keys()):
-            # remove parameter from nn.Moudle, or it can cause bug when assign new value
+            # remove parameter from nn.Module, or it can cause bug when assign new value
             delattr(self, gs_param)
             # set the attribute to None
             setattr(self, gs_param, None)
@@ -70,28 +83,35 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
             scene_box=self.scene_box,
             num_train_data=self.num_train_data,
             model_idx_in_scene_graph=0,
-            **self.kwargs
+            **self.kwargs,
         )
 
-        self.object_annos: InterpolatedAnnotation = self.kwargs["metadata"].get("object_annos", InterpolatedAnnotation(anno_json_path=None))
-        for idx, (obj_id, obj_meta) in enumerate(self.object_annos.objects_meta.items()):
+        self.object_annos: InterpolatedAnnotation = self.kwargs["metadata"].get(
+            "object_annos", InterpolatedAnnotation(anno_json_path=None)
+        )
+        for idx, (obj_id, obj_meta) in enumerate(
+            self.object_annos.objects_meta.items()
+        ):
             object_model_config = copy.deepcopy(self.config.object_model_template)
             object_model_config.use_sky_sphere = False
             object_model_config.sh_degree = self.config.sh_degree
             object_model_config.extent = torch.from_numpy(obj_meta.size).float() / 2
-            self.all_models[self.get_object_model_name(obj_id)] = object_model_config.setup(
-                scene_box=self.scene_box,
-                num_train_data=self.num_train_data,
-                seed_points=self.object_annos.get_seed_pts(obj_id),
-                metadata = self.kwargs["metadata"],
-                model_idx_in_scene_graph = idx + 1
+            self.all_models[self.get_object_model_name(obj_id)] = (
+                object_model_config.setup(
+                    scene_box=self.scene_box,
+                    num_train_data=self.num_train_data,
+                    seed_points=self.object_annos.get_seed_pts(obj_id),
+                    metadata=self.kwargs["metadata"],
+                    model_idx_in_scene_graph=idx + 1,
+                )
             )
         self.visible_model_names: List[str] = list(self.all_models.keys())
         self.means = torch.cat([self.background_model.means], dim=0)
         self.bbox_optimizer: BBoxOptimizer = self.config.bbox_optimizer.setup(
-            num_frames=len(self.object_annos.annos.keys()), 
-            num_bboxes=len(self.object_annos.objects_meta), 
-            frame_idx_map=self.build_frame_idx_map(), device="cpu",
+            num_frames=len(self.object_annos.annos.keys()),
+            num_bboxes=len(self.object_annos.objects_meta),
+            frame_idx_map=self.build_frame_idx_map(),
+            device="cpu",
             bbox_list=self.object_annos.objects_meta.keys(),
         )
 
@@ -101,7 +121,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     def build_frame_idx_map(self):
         frame_idx_map = {}
         for frame_idx, timestamp in enumerate(self.object_annos.annos.keys()):
-            frame_idx_map[int(timestamp)] = torch.tensor(frame_idx,dtype=torch.int)
+            frame_idx_map[int(timestamp)] = torch.tensor(frame_idx, dtype=torch.int)
         return frame_idx_map
 
     @property
@@ -116,7 +136,9 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
                     groups[group_name] += params
                 else:
                     groups[group_name] = params
-        assert len(set(len(v) for v in groups.values())) == 1, "Submodules contain different gaussian param groups"
+        assert (
+            len(set(len(v) for v in groups.values())) == 1
+        ), "Submodules contain different gaussian param groups"
         return groups
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
@@ -129,19 +151,24 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         self, training_callback_attributes: TrainingCallbackAttributes
     ) -> List[TrainingCallback]:
         cbs = []
-        cbs.append(TrainingCallback(
-            [TrainingCallbackLocation.BEFORE_TRAIN_ITERATION], self.step_cb))
+        cbs.append(
+            TrainingCallback(
+                [TrainingCallbackLocation.BEFORE_TRAIN_ITERATION], self.step_cb
+            )
+        )
         # for scene graph model, no longer need to call `after_train`` and `refinement_after` of itself
         for model in self.all_models.values():
             cbs += model.get_training_callbacks(training_callback_attributes)
         return cbs
 
-    def get_aggreated_variable(self, var: str):
+    def get_aggregated_variable(self, var: str):
         """
-        return a concated tensor of the variable from visable models
+        return a concated tensor of the variable from visible models
         eg. means_{all}=torch.cat([means_{bg},means_{obj1},means_{obj2},...],dim=0)
         """
-        vars = [getattr(self.all_models[name], var) for name in self.visible_model_names]
+        vars = [
+            getattr(self.all_models[name], var) for name in self.visible_model_names
+        ]
         for a in vars:
             assert isinstance(a, torch.Tensor)
         return torch.concat(vars, dim=0)
@@ -158,12 +185,15 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
             means_{obj2}=means_{all}[len(means_{bg})+len(means_{obj1}):]
         """
         assert isinstance(vals, torch.Tensor)
-        vars_n = [self.all_models[model_name].num_points for model_name in self.visible_model_names]
-        vals_split = torch.split(vals,vars_n)
+        vars_n = [
+            self.all_models[model_name].num_points
+            for model_name in self.visible_model_names
+        ]
+        vals_split = torch.split(vals, vars_n)
         for model_name, vals_t in zip(self.visible_model_names, vals_split):
             model = self.all_models[model_name]
             setattr(model, var_name, vals_t)
-            if retain_grad and self.training:
+            if retain_grad and self.training and getattr(model, var_name).requires_grad:
                 getattr(model, var_name).retain_grad()
 
     @property
@@ -176,7 +206,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         for model_name, model in self.all_models.items():
             if model_name not in self.visible_model_names:
                 setattr(model, "xys", None)
-        self._xys = self.get_aggreated_variable("xys")
+        self._xys = self.get_aggregated_variable("xys")
 
     @property
     def radii(self):
@@ -185,7 +215,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     @radii.setter
     def radii(self, radii):
         self.set_split_tensor_variable("radii", radii)
-        self._radii = self.get_aggreated_variable("radii")
+        self._radii = self.get_aggregated_variable("radii")
 
     @property
     def depths(self):
@@ -194,7 +224,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     @depths.setter
     def depths(self, depths):
         self.set_split_tensor_variable("depths", depths)
-        self._depths = self.get_aggreated_variable("depths")
+        self._depths = self.get_aggregated_variable("depths")
 
     @property
     def conics(self):
@@ -203,7 +233,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     @conics.setter
     def conics(self, conics):
         self.set_split_tensor_variable("conics", conics)
-        self._conics = self.get_aggreated_variable("conics")
+        self._conics = self.get_aggregated_variable("conics")
 
     @property
     def num_tiles_hit(self):
@@ -212,7 +242,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     @num_tiles_hit.setter
     def num_tiles_hit(self, num_tiles_hit):
         self.set_split_tensor_variable("num_tiles_hit", num_tiles_hit)
-        self._num_tiles_hit = self.get_aggreated_variable("num_tiles_hit")
+        self._num_tiles_hit = self.get_aggregated_variable("num_tiles_hit")
 
     @property
     def last_size(self):
@@ -241,43 +271,72 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         if len(frame_list) == 1:
             normalized_frame = 1.0
         else:
-            normalized_frame = (frame - frame_list[0]) / (frame_list[-1] - frame_list[0])
+            normalized_frame = (frame - frame_list[0]) / (
+                frame_list[-1] - frame_list[0]
+            )
         t = normalized_frame * obj_model.config.fourier_features_scale
         idft_base = IDFT(t, obj_model.config.fourier_features_dim).to(self.device)
-        return torch.sum(obj_model.features_dc*idft_base[..., None], dim=1, keepdim=True)
+        return torch.sum(
+            obj_model.features_dc * idft_base[..., None], dim=1, keepdim=True
+        )
 
-    def aggregate_submodel_var(self, var_name: str, submodel_names: List[str])->torch.Tensor:
+    def aggregate_submodel_var(
+        self, var_name: str, submodel_names: List[str]
+    ) -> torch.Tensor:
         vars = [getattr(self.all_models[name], var_name) for name in submodel_names]
         for a in vars:
             assert isinstance(a, torch.Tensor)
         return torch.cat(vars, dim=0)
 
-    def get_submodel_output(self, camera: Cameras,  submodel_names: List[str], sky_capture=None, object_means=None, object_features_dc=None, output_names=[]) -> torch.Tensor:
+    def get_submodel_output(
+        self,
+        camera: Cameras,
+        submodel_names: List[str],
+        sky_capture=None,
+        object_means=None,
+        object_features_dc=None,
+        output_names=[],
+    ) -> torch.Tensor:
         camera_downscale = self._get_downscale_factor()
         camera.rescale_output_resolution(1 / camera_downscale)
         if object_means is None:
             submodel_means = self.aggregate_submodel_var("means", submodel_names)
-            submodel_features_dc = self.aggregate_submodel_var("features_dc", submodel_names)
+            submodel_features_dc = self.aggregate_submodel_var(
+                "features_dc", submodel_names
+            )
         else:
-            assert object_features_dc is not None, "object_features_dc should not be None when object_means is not None"
-            empty = torch.zeros(camera.height.item(), camera.width.item(), 1, device=self.device)
+            assert (
+                object_features_dc is not None
+            ), "object_features_dc should not be None when object_means is not None"
+            empty = torch.zeros(
+                camera.height.item(), camera.width.item(), 1, device=self.device
+            )
             if len(object_means) == 0:
-                if 'accumulation' in output_names and len(output_names)==1:
-                    return {'accumulation':empty}
-                return {'rgb': empty if sky_capture is None else sky_capture, 'depth': empty}
+                if "accumulation" in output_names and len(output_names) == 1:
+                    return {"accumulation": empty}
+                return {
+                    "rgb": empty if sky_capture is None else sky_capture,
+                    "depth": empty,
+                }
             submodel_means = torch.cat(object_means, dim=0)
             submodel_features_dc = torch.cat(object_features_dc, dim=0)
         submodel_opacities = self.aggregate_submodel_var("opacities", submodel_names)
-        submodel_features_rest = self.aggregate_submodel_var("features_rest", submodel_names)
+        submodel_features_rest = self.aggregate_submodel_var(
+            "features_rest", submodel_names
+        )
         submodel_xys = self.aggregate_submodel_var("xys", submodel_names)
         submodel_depths = self.aggregate_submodel_var("depths", submodel_names)
         submodel_radii = self.aggregate_submodel_var("radii", submodel_names)
         submodel_conics = self.aggregate_submodel_var("conics", submodel_names)
-        submodel_num_tiles_hit = self.aggregate_submodel_var("num_tiles_hit", submodel_names)
+        submodel_num_tiles_hit = self.aggregate_submodel_var(
+            "num_tiles_hit", submodel_names
+        )
         # render submodel
         colors = torch.cat((submodel_features_dc, submodel_features_rest), dim=1)
         if self.config.sh_degree > 0:
-            viewdirs = submodel_means.detach() - camera.camera_to_worlds.detach()[..., :3, 3]  # (N, 3)
+            viewdirs = (
+                submodel_means.detach() - camera.camera_to_worlds.detach()[..., :3, 3]
+            )  # (N, 3)
             viewdirs = viewdirs / viewdirs.norm(dim=-1, keepdim=True)
             n = min(self.step // self.config.sh_degree_interval, self.config.sh_degree)
             if not self.training:
@@ -316,14 +375,14 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         # TODO move aggregating means into a function or @property
         # prepare parameters
         # self.set_concated_gaussian_param_groups()
-        #TODO get extra output for submodels debug and instance loss etc
+        # TODO get extra output for submodels debug and instance loss etc
         object_means = []
         object_quats = []
         object_features_dc = []
         assert camera.times is not None
 
         self.visible_model_names = ["background"]
-        annos_t: List[Box] = self.object_annos[camera.times.item()] #type: ignore
+        annos_t: List[Box] = self.object_annos[camera.times.item()]  # type: ignore
         timestamp = parse_timestamp(camera.times.item())
         exist_frame = False
         if timestamp in self.object_annos.all_names:
@@ -341,39 +400,78 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
                     self.bbox_optimizer.apply_to_bbox(anno)
                 # add fourier features of time
                 if self.config.fourier_features_dim > 1:
-                    object_features_dc.append(self.get_fourier_features(anno.frame, trackId, obj_model))
+                    object_features_dc.append(
+                        self.get_fourier_features(anno.frame, trackId, obj_model)
+                    )
                 else:
                     object_features_dc.append(obj_model.features_dc)
                 # aggregate all models properties for splatting
                 self.visible_model_names.append(model_name)
                 obj_means, obj_quats = object2world_gs(
-                    obj_model.means, obj_model.quats, anno.center, anno.rot)
+                    obj_model.means, obj_model.quats, anno.center, anno.rot
+                )
                 object_means.append(obj_means)
                 object_quats.append(obj_quats)
 
         # render all models
         self.means = torch.cat([self.background_model.means, *object_means], dim=0)
         self.quats = torch.cat([self.background_model.quats, *object_quats], dim=0)
-        self.features_dc = torch.cat([self.background_model.features_dc, *object_features_dc], dim=0)
-        self.opacities = self.get_aggreated_variable("opacities")
-        self.features_rest = self.get_aggreated_variable("features_rest")
-        self.scales = self.get_aggreated_variable("scales")
-        assert self.crop_box is None or self.training, "crop_box is not supported for scene graph model now"
+        self.features_dc = torch.cat(
+            [self.background_model.features_dc, *object_features_dc], dim=0
+        )
+        self.opacities = self.get_aggregated_variable("opacities")
+        self.features_rest = self.get_aggregated_variable("features_rest")
+        self.scales = self.get_aggregated_variable("scales")
+        assert (
+            self.crop_box is None or self.training
+        ), "crop_box is not supported for scene graph model now"
         # forward like the original model
         out = super().get_outputs(camera)
-        out['object_acc'] = (self.get_submodel_output(camera, [submodel_name for submodel_name in self.visible_model_names if submodel_name.startswith("object")],
-                                                       object_means=object_means, object_features_dc=object_features_dc, output_names=['accumulation']))['accumulation']
-        out['background_acc'] = (self.get_submodel_output(camera, ["background"], output_names=['accumulation']))['accumulation']
+        out["object_acc"] = (
+            self.get_submodel_output(
+                camera,
+                [
+                    submodel_name
+                    for submodel_name in self.visible_model_names
+                    if submodel_name.startswith("object")
+                ],
+                object_means=object_means,
+                object_features_dc=object_features_dc,
+                output_names=["accumulation"],
+            )
+        )["accumulation"]
+        out["background_acc"] = (
+            self.get_submodel_output(
+                camera, ["background"], output_names=["accumulation"]
+            )
+        )["accumulation"]
         if not self.training:
             with torch.no_grad():
-                background_output = self.get_submodel_output(camera, ["background"], sky_capture=out.get("sky", None), output_names=['rgb'])
-                out.update({f"background_{k}":v for k, v in background_output.items()})
-                object_output = self.get_submodel_output(camera, [submodel_name for submodel_name in self.visible_model_names if submodel_name.startswith("object")], object_means=object_means, object_features_dc=object_features_dc, output_names=['rgb'])
-                out.update({f"object_{k}":v for k, v in object_output.items()})
+                background_output = self.get_submodel_output(
+                    camera,
+                    ["background"],
+                    sky_capture=out.get("sky", None),
+                    output_names=["rgb"],
+                )
+                out.update({f"background_{k}": v for k, v in background_output.items()})
+                object_output = self.get_submodel_output(
+                    camera,
+                    [
+                        submodel_name
+                        for submodel_name in self.visible_model_names
+                        if submodel_name.startswith("object")
+                    ],
+                    object_means=object_means,
+                    object_features_dc=object_features_dc,
+                    output_names=["rgb"],
+                )
+                out.update({f"object_{k}": v for k, v in object_output.items()})
 
         return out
 
-    def get_loss_dict(self, outputs, batch, metrics_dict=None) -> Dict[str, torch.Tensor]:
+    def get_loss_dict(
+        self, outputs, batch, metrics_dict=None
+    ) -> Dict[str, torch.Tensor]:
         """Computes and returns the losses dict.
 
         Args:
@@ -383,10 +481,18 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         """
         losses = super().get_loss_dict(outputs, batch, metrics_dict)
 
-        if self.config.object_acc_entropy_loss_mult > 0. and self.step > self.config.background_model.stop_split_at:
-            object_acc = torch.clamp(outputs['object_acc'], min=1e-5, max=1-1e-5)
-            losses['object_acc_entropy_loss'] = self.config.object_acc_entropy_loss_mult * \
-            -(object_acc*torch.log(object_acc) + (1. - object_acc)*torch.log(1. - object_acc)).mean()
+        if (
+            self.config.object_acc_entropy_loss_mult > 0.0
+            and self.step > self.config.background_model.stop_split_at
+        ):
+            object_acc = torch.clamp(outputs["object_acc"], min=1e-5, max=1 - 1e-5)
+            losses["object_acc_entropy_loss"] = (
+                self.config.object_acc_entropy_loss_mult
+                * -(
+                    object_acc * torch.log(object_acc)
+                    + (1.0 - object_acc) * torch.log(1.0 - object_acc)
+                ).mean()
+            )
 
         return losses
 
@@ -400,10 +506,8 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         torch.nn.Module.load_state_dict(self, dict, strict=False)
 
 
-
 def object2world_gs(means, quats, pose, rot):
-    """Transform the object GS from object to world coordinate system
-    """
+    """Transform the object GS from object to world coordinate system"""
 
     assert means.dim() == 2 and means.shape[1] == 3
     assert quats.dim() == 2 and quats.shape[1] == 4
@@ -412,7 +516,7 @@ def object2world_gs(means, quats, pose, rot):
     # convert rot_o2w to quat_o2w
     quat_o2w = torch.from_numpy(quaternion_from_matrix(rot))
     # transform the object GS from object to world coordinate system
-    means_w = torch.matmul(means, rot_o2w.T) + pose_o2w[None, :] #[N_pts,3]
+    means_w = torch.matmul(means, rot_o2w.T) + pose_o2w[None, :]  # [N_pts,3]
     quat_w = quaternion_multiply(quat_o2w, quats)
     return [means_w.squeeze(), quat_w.squeeze()]
 
