@@ -106,17 +106,17 @@ def resize_image(image: torch.Tensor, d: int):
 
 
 def projection_matrix(
-    znear, zfar, fovx, fovy, device: Union[str, torch.device] = "cpu"
+    z_near, z_far, fov_x, fov_y, device: Union[str, torch.device] = "cpu"
 ):
     """
     Constructs an OpenGL-style perspective projection matrix.
     """
-    t = znear * math.tan(0.5 * fovy)
+    t = z_near * math.tan(0.5 * fov_y)
     b = -t
-    r = znear * math.tan(0.5 * fovx)
+    r = z_near * math.tan(0.5 * fov_x)
     l = -r
-    n = znear
-    f = zfar
+    n = z_near
+    f = z_far
     return torch.tensor(
         [
             [2 * n / (r - l), 0.0, (r + l) / (r - l), 0.0],
@@ -301,7 +301,7 @@ class SplatfactoModel(Model):
                 * self.config.random_scale
             )
         self.xys_grad_norm = None
-        self.max_2Dsize = None
+        self.max_2D_size = None
         distances, _ = self.k_nearest_sklearn(means.data, 3)
         distances = torch.from_numpy(distances)
         # find the average of the three nearest neighbors for each point and use that as the scale
@@ -480,10 +480,10 @@ class SplatfactoModel(Model):
                 "opacities",
             ]:
                 dict[f"gauss_params.{p}"] = dict[p]
-        newp = dict["gauss_params.means"].shape[0]
+        new_p = dict["gauss_params.means"].shape[0]
         for name, param in self.gauss_params.items():
             old_shape = param.shape
-            new_shape = (newp,) + old_shape[1:]
+            new_shape = (new_p,) + old_shape[1:]
             self.gauss_params[name] = torch.nn.Parameter(
                 torch.zeros(new_shape, device=self.device)
             )
@@ -599,12 +599,12 @@ class SplatfactoModel(Model):
                 )
 
             # update the max screen size, as a ratio of number of pixels
-            if self.max_2Dsize is None:
-                self.max_2Dsize = torch.zeros_like(self.radii, dtype=torch.float32)
-            newradii = self.radii.detach()[visible_mask]
-            self.max_2Dsize[visible_mask] = torch.maximum(
-                self.max_2Dsize[visible_mask],
-                newradii / float(max(self.last_size[0], self.last_size[1])),
+            if self.max_2D_size is None:
+                self.max_2D_size = torch.zeros_like(self.radii, dtype=torch.float32)
+            new_radii = self.radii.detach()[visible_mask]
+            self.max_2D_size[visible_mask] = torch.maximum(
+                self.max_2D_size[visible_mask],
+                new_radii / float(max(self.last_size[0], self.last_size[1])),
             )
 
     def set_crop(self, crop_box: Optional[OrientedBox]):
@@ -637,7 +637,7 @@ class SplatfactoModel(Model):
                 assert (
                     self.xys_grad_norm is not None
                     and self.vis_counts is not None
-                    and self.max_2Dsize is not None
+                    and self.max_2D_size is not None
                 )
                 avg_grad_norm = (
                     (self.xys_grad_norm / self.vis_counts)
@@ -657,11 +657,11 @@ class SplatfactoModel(Model):
                 ).squeeze()
                 if self.step < self.config.stop_screen_size_at:
                     splits |= (
-                        self.max_2Dsize > self.config.split_screen_size
+                        self.max_2D_size > self.config.split_screen_size
                     ).squeeze()
                 splits &= high_grads
-                nsamps = self.config.n_split_samples
-                split_params = self.split_gaussians(splits, nsamps)
+                n_samples = self.config.n_split_samples
+                split_params = self.split_gaussians(splits, n_samples)
                 self.refine_record_dict.update(
                     {"refine_splits_count": splits.sum().item()}
                 )
@@ -681,10 +681,10 @@ class SplatfactoModel(Model):
                         )
                     )
 
-                # append zeros to the max_2Dsize tensor
-                self.max_2Dsize = torch.cat(
+                # append zeros to the max_2D_size tensor
+                self.max_2D_size = torch.cat(
                     [
-                        self.max_2Dsize,
+                        self.max_2D_size,
                         torch.zeros_like(split_params["scales"][:, 0]),
                         torch.zeros_like(dup_params["scales"][:, 0]),
                     ],
@@ -692,17 +692,17 @@ class SplatfactoModel(Model):
                 )
 
                 split_idcs = torch.where(splits)[0]
-                self.dup_in_all_optim(optimizers, split_idcs, nsamps)
+                self.dup_in_all_optim(optimizers, split_idcs, n_samples)
 
                 dup_idcs = torch.where(dups)[0]
                 self.dup_in_all_optim(optimizers, dup_idcs, 1)
 
-                # After a guassian is split into two new gaussians, the original one should also be pruned.
+                # After a gaussian is split into two new gaussians, the original one should also be pruned.
                 splits_mask = torch.cat(
                     (
                         splits,
                         torch.zeros(
-                            nsamps * splits.sum() + dups.sum(),
+                            n_samples * splits.sum() + dups.sum(),
                             device=self.device,
                             dtype=torch.bool,
                         ),
@@ -716,7 +716,7 @@ class SplatfactoModel(Model):
             ):
                 deleted_mask = self.cull_gaussians()
             else:
-                # if we donot allow culling post refinement, no more gaussians will be pruned.
+                # if we do not allow culling post refinement, no more gaussians will be pruned.
                 deleted_mask = None
 
             if deleted_mask is not None:
@@ -746,7 +746,7 @@ class SplatfactoModel(Model):
 
             self.xys_grad_norm = None
             self.vis_counts = None
-            self.max_2Dsize = None
+            self.max_2D_size = None
 
     def cull_gaussians(self, extra_cull_mask: Optional[torch.Tensor] = None):
         """
@@ -769,9 +769,10 @@ class SplatfactoModel(Model):
             ).squeeze()
             if self.step < self.config.stop_screen_size_at:
                 # cull big screen space
-                assert self.max_2Dsize is not None
+                assert self.max_2D_size is not None
                 toobigs = (
-                    toobigs | (self.max_2Dsize > self.config.cull_screen_size).squeeze()
+                    toobigs
+                    | (self.max_2D_size > self.config.cull_screen_size).squeeze()
                 )
             culls = culls | toobigs
             toobigs_count = torch.sum(toobigs).item()
@@ -783,39 +784,39 @@ class SplatfactoModel(Model):
 
         return culls
 
-    def split_gaussians(self, split_mask, samps):
+    def split_gaussians(self, split_mask, samples):
         """
         This function splits gaussians that are too large
         """
         n_splits = split_mask.sum().item()
         # step 1, sample new means
         centered_samples = torch.randn(
-            (samps * n_splits, 3), device=self.device
+            (samples * n_splits, 3), device=self.device
         )  # Nx3 of axis-aligned scales
         scaled_samples = (
-            torch.exp(self.scales[split_mask].repeat(samps, 1)) * centered_samples
+            torch.exp(self.scales[split_mask].repeat(samples, 1)) * centered_samples
         )
         quats = self.quats[split_mask] / self.quats[split_mask].norm(
             dim=-1, keepdim=True
         )  # normalize them first
-        rots = quat_to_rotmat(quats.repeat(samps, 1))  # how these scales are rotated
+        rots = quat_to_rotmat(quats.repeat(samples, 1))  # how these scales are rotated
         rotated_samples = torch.bmm(rots, scaled_samples[..., None]).squeeze()
-        new_means = rotated_samples + self.means[split_mask].repeat(samps, 1)
+        new_means = rotated_samples + self.means[split_mask].repeat(samples, 1)
         # step 2, sample new colors
-        new_features_dc = self.features_dc[split_mask].repeat(samps, 1, 1)
-        new_features_rest = self.features_rest[split_mask].repeat(samps, 1, 1)
+        new_features_dc = self.features_dc[split_mask].repeat(samples, 1, 1)
+        new_features_rest = self.features_rest[split_mask].repeat(samples, 1, 1)
         # step 3, sample new opacities
-        new_opacities = self.opacities[split_mask].repeat(samps, 1)
+        new_opacities = self.opacities[split_mask].repeat(samples, 1)
         # step 4, sample new scales
         size_fac = 1.6
         new_scales = torch.log(torch.exp(self.scales[split_mask]) / size_fac).repeat(
-            samps, 1
+            samples, 1
         )
         self.scales[split_mask] = torch.log(
             torch.exp(self.scales[split_mask]) / size_fac
         )
         # step 5, sample new quats
-        new_quats = self.quats[split_mask].repeat(samps, 1)
+        new_quats = self.quats[split_mask].repeat(samples, 1)
         out = {
             "means": new_means,
             "features_dc": new_features_dc,
@@ -826,14 +827,13 @@ class SplatfactoModel(Model):
         }
         for name, param in self.gauss_params.items():
             if name not in out:
-                out[name] = param[split_mask].repeat(samps, 1)
+                out[name] = param[split_mask].repeat(samples, 1)
         return out
 
     def dup_gaussians(self, dup_mask):
         """
         This function duplicates gaussians that are too small
         """
-        n_dups = dup_mask.sum().item()
         new_dups = {}
         for name, param in self.gauss_params.items():
             new_dups[name] = param[dup_mask]
@@ -909,11 +909,11 @@ class SplatfactoModel(Model):
     def _downscale_if_required(self, image):
         d = self._get_downscale_factor()
         if d > 1:
-            newsize = [image.shape[0] // d, image.shape[1] // d]
+            new_size = [image.shape[0] // d, image.shape[1] // d]
 
             # torchvision can be slow to import, so we do it lazily.
 
-            return TF.resize(image.permute(2, 0, 1), newsize, antialias=None).permute(
+            return TF.resize(image.permute(2, 0, 1), new_size, antialias=None).permute(
                 1, 2, 0
             )
         return image
@@ -936,7 +936,7 @@ class SplatfactoModel(Model):
         """Takes in a Ray Bundle and returns a dictionary of outputs.
 
         Args:
-            ray_bundle: Input bundle of rays. This raybundle should have all the
+            ray_bundle: Input bundle of rays. This ray_bundle should have all the
             needed information to compute the outputs.
 
         Returns:
@@ -1164,7 +1164,7 @@ class SplatfactoModel(Model):
         return outputs
 
     def get_gt_img(self, image: torch.Tensor):
-        """Compute groundtruth image with iteration dependent downscale factor for evaluation purpose
+        """Compute ground truth image with iteration dependent downscale factor for evaluation purpose
 
         Args:
             image: tensor.Tensor in type uint8 or float32
@@ -1183,12 +1183,12 @@ class SplatfactoModel(Model):
         """
         d = self._get_downscale_factor()
         if d > 1:
-            newsize = (
+            new_size = (
                 int(math.ceil(batch["image"].shape[0] / d)),
                 int(math.ceil(batch["image"].shape[1] / d)),
             )
             gt_img = TF.resize(
-                batch["image"].permute(2, 0, 1), newsize, antialias=None
+                batch["image"].permute(2, 0, 1), new_size, antialias=None
             ).permute(1, 2, 0)
         else:
             gt_img = batch["image"]
@@ -1221,24 +1221,24 @@ class SplatfactoModel(Model):
         gt_semantic = None
 
         if self.training and d > 1:
-            newsize = (
+            new_size = (
                 int(math.ceil(batch["image"].shape[0] / d)),
                 int(math.ceil(batch["image"].shape[1] / d)),
             )
             gt_img = TF.resize(
-                batch["image"].permute(2, 0, 1), newsize, antialias=None
+                batch["image"].permute(2, 0, 1), new_size, antialias=None
             ).permute(1, 2, 0)
             if "mask" in batch:
                 mask = TF.resize(
                     batch["mask"].permute(2, 0, 1),
-                    newsize,
+                    new_size,
                     antialias=None,
                     interpolation=TF.InterpolationMode.NEAREST,
                 ).permute(1, 2, 0)
             if "semantic" in batch:
                 gt_semantic = TF.resize(
                     batch["semantic"].permute(2, 0, 1),
-                    newsize,
+                    new_size,
                     antialias=None,
                     interpolation=TF.InterpolationMode.NEAREST,
                 ).permute(1, 2, 0)
@@ -1256,11 +1256,11 @@ class SplatfactoModel(Model):
             gt_img *= mask
             rgb *= mask
         Ll1 = torch.abs(gt_img - rgb).mean()
-        simloss = 1 - self.ssim(
+        sim_loss = 1 - self.ssim(
             gt_img.permute(2, 0, 1)[None, ...], rgb.permute(2, 0, 1)[None, ...]
         )
         losses["Ll1"] = (1 - self.config.ssim_lambda) * Ll1
-        losses["simloss"] = self.config.ssim_lambda * simloss
+        losses["simloss"] = self.config.ssim_lambda * sim_loss
 
         # sky acc loss
         accumulation = outputs["accumulation"]
@@ -1275,11 +1275,11 @@ class SplatfactoModel(Model):
     def get_outputs_for_camera(
         self, camera: Cameras, obb_box: Optional[OrientedBox] = None
     ) -> Dict[str, torch.Tensor]:
-        """Takes in a camera, generates the raybundle, and computes the output of the model.
+        """Takes in a camera, generates the ray_bundle, and computes the output of the model.
         Overridden for a camera-based gaussian model.
 
         Args:
-            camera: generates raybundle
+            camera: generates ray_bundle
         """
         assert camera is not None, "must provide camera to gaussian model"
         self.set_crop(obb_box)
@@ -1306,9 +1306,9 @@ class SplatfactoModel(Model):
             # torchvision can be slow to import, so we do it lazily.
             import torchvision.transforms.functional as TF
 
-            newsize = [batch["image"].shape[0] // d, batch["image"].shape[1] // d]
+            new_size = [batch["image"].shape[0] // d, batch["image"].shape[1] // d]
             predicted_rgb = TF.resize(
-                outputs["rgb"].permute(2, 0, 1), newsize, antialias=None
+                outputs["rgb"].permute(2, 0, 1), new_size, antialias=None
             ).permute(1, 2, 0)
         else:
             predicted_rgb = outputs["rgb"]
