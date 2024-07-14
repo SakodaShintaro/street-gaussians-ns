@@ -23,3 +23,13 @@ date -ud @$SECONDS "+%T"
 # Eval model
 bash scripts/shells/eval.sh $latest_output_dir/config.yml $cuda_id
 date -ud @$SECONDS "+%T"
+
+# concat
+python3 scripts/pythons/concat_images.py \
+  ${latest_output_dir}/renders/all/gt-rgb \
+  ${latest_output_dir}/renders/all/rgb \
+  ${latest_output_dir}/renders/all/concat \
+  --text1 "GT" \
+  --text2 "Street-Gaussigns-NS" \
+  --ext "jpg"
+date -ud @$SECONDS "+%T"
