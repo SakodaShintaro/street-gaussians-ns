@@ -8,9 +8,7 @@ import math
 from gsplat import spherical_harmonics
 from pytorch3d.transforms import quaternion_multiply
 from torch.nn import Parameter
-import mediapy as media
 import torch
-import torchvision.transforms.functional as TF
 
 from nerfstudio.engine.callbacks import (
     TrainingCallback,
@@ -66,7 +64,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         self.config.random_init = True
         super().populate_modules()
         for gs_param in list(self.gauss_params.keys()):
-            # remove parameter from nn.Moudle, or it can cause bug when assign new value
+            # remove parameter from nn.Module, or it can cause bug when assign new value
             delattr(self, gs_param)
             # set the attribute to None
             setattr(self, gs_param, None)
@@ -163,9 +161,9 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
             cbs += model.get_training_callbacks(training_callback_attributes)
         return cbs
 
-    def get_aggreated_variable(self, var: str):
+    def get_aggregated_variable(self, var: str):
         """
-        return a concated tensor of the variable from visable models
+        return a concated tensor of the variable from visible models
         eg. means_{all}=torch.cat([means_{bg},means_{obj1},means_{obj2},...],dim=0)
         """
         vars = [
@@ -208,7 +206,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         for model_name, model in self.all_models.items():
             if model_name not in self.visible_model_names:
                 setattr(model, "xys", None)
-        self._xys = self.get_aggreated_variable("xys")
+        self._xys = self.get_aggregated_variable("xys")
 
     @property
     def radii(self):
@@ -217,7 +215,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     @radii.setter
     def radii(self, radii):
         self.set_split_tensor_variable("radii", radii)
-        self._radii = self.get_aggreated_variable("radii")
+        self._radii = self.get_aggregated_variable("radii")
 
     @property
     def depths(self):
@@ -226,7 +224,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     @depths.setter
     def depths(self, depths):
         self.set_split_tensor_variable("depths", depths)
-        self._depths = self.get_aggreated_variable("depths")
+        self._depths = self.get_aggregated_variable("depths")
 
     @property
     def conics(self):
@@ -235,7 +233,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     @conics.setter
     def conics(self, conics):
         self.set_split_tensor_variable("conics", conics)
-        self._conics = self.get_aggreated_variable("conics")
+        self._conics = self.get_aggregated_variable("conics")
 
     @property
     def num_tiles_hit(self):
@@ -244,7 +242,7 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
     @num_tiles_hit.setter
     def num_tiles_hit(self, num_tiles_hit):
         self.set_split_tensor_variable("num_tiles_hit", num_tiles_hit)
-        self._num_tiles_hit = self.get_aggreated_variable("num_tiles_hit")
+        self._num_tiles_hit = self.get_aggregated_variable("num_tiles_hit")
 
     @property
     def last_size(self):
@@ -421,9 +419,9 @@ class SplatfactoSceneGraphModel(SplatfactoModel):
         self.features_dc = torch.cat(
             [self.background_model.features_dc, *object_features_dc], dim=0
         )
-        self.opacities = self.get_aggreated_variable("opacities")
-        self.features_rest = self.get_aggreated_variable("features_rest")
-        self.scales = self.get_aggreated_variable("scales")
+        self.opacities = self.get_aggregated_variable("opacities")
+        self.features_rest = self.get_aggregated_variable("features_rest")
+        self.scales = self.get_aggregated_variable("scales")
         assert (
             self.crop_box is None or self.training
         ), "crop_box is not supported for scene graph model now"
