@@ -34,98 +34,13 @@ from nerfstudio.utils.colors import get_color
 from nerfstudio.utils.rich_utils import CONSOLE
 from nerfstudio.utils import colormaps
 from nerfstudio.cameras.cameras import Cameras
-
+from nerfstudio.models.splatfacto import (
+    random_quat_tensor,
+    RGB2SH,
+    SH2RGB,
+)
 from street_gaussians_ns.data.utils.data_utils import SemanticType
-
-
-def num_sh_bases(degree: int):
-    if degree == 0:
-        return 1
-    if degree == 1:
-        return 4
-    if degree == 2:
-        return 9
-    if degree == 3:
-        return 16
-    return 25
-
-
-def random_quat_tensor(N):
-    """
-    Defines a random quaternion tensor of shape (N, 4)
-    """
-    u = torch.rand(N)
-    v = torch.rand(N)
-    w = torch.rand(N)
-    return torch.stack(
-        [
-            torch.sqrt(1 - u) * torch.sin(2 * math.pi * v),
-            torch.sqrt(1 - u) * torch.cos(2 * math.pi * v),
-            torch.sqrt(u) * torch.sin(2 * math.pi * w),
-            torch.sqrt(u) * torch.cos(2 * math.pi * w),
-        ],
-        dim=-1,
-    )
-
-
-def RGB2SH(rgb):
-    """
-    Converts from RGB values [0,1] to the 0th spherical harmonic coefficient
-    """
-    C0 = 0.28209479177387814
-    return (rgb - 0.5) / C0
-
-
-def SH2RGB(sh):
-    """
-    Converts from the 0th spherical harmonic coefficient to RGB values [0,1]
-    """
-    C0 = 0.28209479177387814
-    return sh * C0 + 0.5
-
-
-def resize_image(image: torch.Tensor, d: int):
-    """
-    Downscale images using the same 'area' method in opencv
-
-    :param image shape [H, W, C]
-    :param d downscale factor (must be 2, 4, 8, etc.)
-
-    return downscaled image in shape [H//d, W//d, C]
-    """
-    import torch.nn.functional as tf
-
-    weight = (1.0 / (d * d)) * torch.ones(
-        (1, 1, d, d), dtype=torch.float32, device=image.device
-    )
-    return (
-        tf.conv2d(image.permute(2, 0, 1)[:, None, ...], weight, stride=d)
-        .squeeze(1)
-        .permute(1, 2, 0)
-    )
-
-
-def projection_matrix(
-    z_near, z_far, fov_x, fov_y, device: Union[str, torch.device] = "cpu"
-):
-    """
-    Constructs an OpenGL-style perspective projection matrix.
-    """
-    t = z_near * math.tan(0.5 * fov_y)
-    b = -t
-    r = z_near * math.tan(0.5 * fov_x)
-    l = -r  # noqa: E741
-    n = z_near
-    f = z_far
-    return torch.tensor(
-        [
-            [2 * n / (r - l), 0.0, (r + l) / (r - l), 0.0],
-            [0.0, 2 * n / (t - b), (t + b) / (t - b), 0.0],
-            [0.0, 0.0, (f + n) / (f - n), -1.0 * f * n / (f - n)],
-            [0.0, 0.0, 1.0, 0.0],
-        ],
-        device=device,
-    )
+from gsplat.cuda_legacy._wrapper import num_sh_bases
 
 
 class EnvLight(torch.nn.Module):
