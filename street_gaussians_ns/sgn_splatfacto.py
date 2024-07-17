@@ -36,7 +36,6 @@ from nerfstudio.models.splatfacto import (
     RGB2SH,
     SH2RGB,
 )
-from street_gaussians_ns.data.utils.data_utils import SemanticType
 from street_gaussians_ns.sgn_sky_model import EnvLight
 from gsplat.cuda_legacy._wrapper import num_sh_bases
 
@@ -1059,72 +1058,6 @@ class SplatfactoModel(Model):
         metrics_dict["self.radii"] = self.radii.float().mean()
 
         return metrics_dict
-
-    def get_loss_dict(
-        self, outputs, batch, metrics_dict=None
-    ) -> Dict[str, torch.Tensor]:
-        """Computes and returns the losses dict.
-
-        Args:
-            outputs: the output to compute loss dict to
-            batch: ground truth batch corresponding to outputs
-            metrics_dict: dictionary of metrics, some of which we can use for loss
-        """
-        losses = {}
-        d = self._get_downscale_factor()
-        mask = None
-        gt_semantic = None
-
-        if self.training and d > 1:
-            new_size = (
-                int(math.ceil(batch["image"].shape[0] / d)),
-                int(math.ceil(batch["image"].shape[1] / d)),
-            )
-            gt_img = TF.resize(
-                batch["image"].permute(2, 0, 1), new_size, antialias=None
-            ).permute(1, 2, 0)
-            if "mask" in batch:
-                mask = TF.resize(
-                    batch["mask"].permute(2, 0, 1),
-                    new_size,
-                    antialias=None,
-                    interpolation=TF.InterpolationMode.NEAREST,
-                ).permute(1, 2, 0)
-            if "semantic" in batch:
-                gt_semantic = TF.resize(
-                    batch["semantic"].permute(2, 0, 1),
-                    new_size,
-                    antialias=None,
-                    interpolation=TF.InterpolationMode.NEAREST,
-                ).permute(1, 2, 0)
-        else:
-            gt_img = batch["image"]
-            if "mask" in batch:
-                mask = batch["mask"]
-            if "semantic" in batch:
-                gt_semantic = batch["semantic"]
-
-        # RGB loss
-        rgb = outputs["rgb"]
-        if mask is not None:
-            mask = mask.to(gt_img.device)
-            gt_img *= mask
-            rgb *= mask
-        Ll1 = torch.abs(gt_img - rgb).mean()
-        sim_loss = 1 - self.ssim(
-            gt_img.permute(2, 0, 1)[None, ...], rgb.permute(2, 0, 1)[None, ...]
-        )
-        losses["Ll1"] = (1 - self.config.ssim_lambda) * Ll1
-        losses["simloss"] = self.config.ssim_lambda * sim_loss
-
-        # sky acc loss
-        accumulation = outputs["accumulation"]
-        if gt_semantic is not None and self.config.sky_acc_loss_mult > 0:
-            sky_mask = (gt_semantic == SemanticType.SKY.value).cuda()
-            losses["sky_accumulation"] = (
-                self.config.sky_acc_loss_mult * (sky_mask * accumulation).mean()
-            )
-        return losses
 
     @torch.no_grad()
     def get_outputs_for_camera(
