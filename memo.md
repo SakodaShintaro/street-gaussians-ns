@@ -145,4 +145,8 @@ sudo apt install ros-humble-ros-base
 source /opt/ros/humble/setup.bash
 
 pip3 install opencv-python cv_bridge
+
+sudo apt-get update && sudo apt-get install --reinstall -y \
+  libmpich-dev \
+  hwloc-nox libmpich12 mpich
 ```
