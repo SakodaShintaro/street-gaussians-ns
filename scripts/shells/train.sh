@@ -1,4 +1,7 @@
-data_root=$1
+#!/bin/bash
+set -eux
+
+data_root=${1}
 cuda_id=0
 
 mkdir -p output/
