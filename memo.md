@@ -64,9 +64,15 @@ nerf-studioのドキュメントを参考にする
 
 <https://hub.docker.com/r/dromni/nerfstudio>
 
-から最新を取得する。現在だと
+を使う。
 
 ```bash
+git clone https://github.com/SakodaShintaro/street-gaussians-ns
+cd street-gaussians-ns/
+
+# イメージをDockerfileから作る
+docker build -t my-pytorch-image .
+
 docker run --gpus all \
             -v $HOME/data:/home/user/data/ \
             -v $HOME/.cache/:/home/user/.cache/ \
@@ -77,10 +83,13 @@ docker run --gpus all \
             --privileged \
             my-pytorch-image \
             /bin/bash
-```
 
-```bash
-sudo apt install -y ffmpeg libgl1-mesa-glx libglib2.0-0
+sudo apt update
+sudo apt install -y ffmpeg libgl1-mesa-glx libglib2.0-0 libapparmor1 libglapi-mesa libglx-mesa0 libgl1-mesa-dri libgbm1
+
+git clone https://github.com/SakodaShintaro/street-gaussians-ns
+cd street-gaussians-ns/
+
 git submodule update --init --recursive
 pip3 install "git+https://github.com/facebookresearch/pytorch3d.git"
 pip3 install -e .
@@ -89,24 +98,23 @@ cd dependencies/detectron2
 pip3 install -e .
 cd ../Mask2Former
 pip3 install -r requirements.txt
-cd mask2former/modeling/pixel_decoder/ops
+
+# sh make.sh はそのままだと権限の問題で上手くいかない
+# make.shスクリプトの末尾に--userをつけてから実行する
+# 例) python3 setup.py build install --user
+vim make.sh
 sh make.sh
-# これは権限の問題で上手くいかない
-# make.shスクリプトの末尾に--userをつければいい
-python3 setup.py build install --user
 
-sudo apt install -y libgl1-mesa-glx libglib2.0-0
 sudo apt install tzdata
-```
 
-## イメージをDockerfileから作る
-
-```bash
-docker build -t my-pytorch-image .
-```
-
-モデルのコピー
-
-```bash
+cd ~/street-gaussians-ns/
 wget -P dependencies/Mask2Former/models/ https://dl.fbaipublicfiles.com/maskformer/mask2former/mapillary_vistas/semantic/maskformer2_swin_large_IN21k_384_bs16_300k/model_final_90ee2d.pkl
+```
+
+### 実行
+
+```bash
+export PATH=$PATH:~/.local/bin
+pip3 install nerfstudio==1.1.4
+bash ./scripts/shells/train.sh ~/data/rosbag/20241221_for_3dgs/train_data/
 ```
