@@ -119,3 +119,30 @@ export PATH=$PATH:~/.local/bin
 pip3 install nerfstudio==1.1.4
 bash ./scripts/shells/train.sh ~/data/rosbag/20241221_for_3dgs/train_data/
 ```
+
+### ros2 (humble)
+
+https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html
+
+```
+locale  # check for UTF-8
+
+sudo apt update && sudo apt install locales
+sudo locale-gen en_US en_US.UTF-8
+sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+export LANG=en_US.UTF-8
+
+locale  # verify settings
+
+sudo apt install software-properties-common
+sudo add-apt-repository universe
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+sudo apt update
+
+sudo apt install ros-humble-ros-base
+source /opt/ros/humble/setup.bash
+
+pip3 install opencv-python cv_bridge
+```
