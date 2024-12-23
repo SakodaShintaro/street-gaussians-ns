@@ -76,6 +76,7 @@ docker build -t my-pytorch-image .
 docker run --gpus all \
             -v $HOME/data:/home/user/data/ \
             -v $HOME/.cache/:/home/user/.cache/ \
+            -v $(readlink -f ./street-gaussians-ns/):/home/user/street-gaussians-ns
             -v /media:/media \
             -p 7007:7007 \
             -it \
